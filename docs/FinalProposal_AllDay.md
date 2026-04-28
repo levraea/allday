@@ -103,7 +103,7 @@ an AI endpoint for task parsing.
 
 - /projects CRUD routes
 
-- /ai/parse-task route
+- /ai/plan-goal route
 
 **\**
 

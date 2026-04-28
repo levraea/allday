@@ -1,12 +1,12 @@
 # AllDay
 
-AI-assisted personal task management (MERN coursework stack): **Vite + React** client, **Express + MongoDB** API, optional **Google Gemini** (default) or **OpenAI** parsing for natural-language tasks.
+AI-assisted personal task management (MERN coursework stack): **Vite + React** client, **Express + MongoDB** API, optional **Google Gemini** (default) or **OpenAI** planning from natural-language goals.
 
 ## Prerequisites
 
 - Node.js 18+ (uses `node --watch` for the API in dev)
 - MongoDB reachable via `MONGODB_URI`
-- Optional: **Gemini** (`GEMINI_API_KEY` from [Google AI Studio](https://aistudio.google.com/apikey)), or set `AI_PROVIDER=openai` and use `OPENAI_API_KEY` for `POST /api/ai/parse-task`
+- Optional: **Gemini** (`GEMINI_API_KEY` from [Google AI Studio](https://aistudio.google.com/apikey)), or set `AI_PROVIDER=openai` and use `OPENAI_API_KEY` for `POST /api/ai/plan-goal`
 
 ## Setup
 
@@ -45,7 +45,7 @@ For `npm run preview` or a deployed static build, set `VITE_API_URL` to your API
 | CRUD | `/api/projects` | Projects |
 | CRUD | `/api/tasks` | Tasks (`?projectId=&status=&priority=`) |
 | GET | `/api/stats` | Dashboard counts and lists |
-| POST | `/api/ai/parse-task` | `{ "text": "..." }` → structured fields (default: Gemini + `GEMINI_API_KEY`; or `AI_PROVIDER=openai` + `OPENAI_API_KEY`) |
+| POST | `/api/ai/plan-goal` | `{ "text": "..." }` → structured project + task plan (default: Gemini + `GEMINI_API_KEY`; or `AI_PROVIDER=openai` + `OPENAI_API_KEY`) |
 
 Deleting a **project** deletes its **tasks** as well.
 

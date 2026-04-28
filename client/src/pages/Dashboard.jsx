@@ -68,17 +68,13 @@ export default function Dashboard() {
     setParsed(null)
     setAiLoading(true)
     try {
-      const body = {
-        text: aiText,
-        defaultProjectId: projectIdForAi || undefined,
-      }
-      const result = await api('/api/ai/parse-task', {
+      const result = await api('/api/ai/plan-goal', {
         method: 'POST',
-        body: JSON.stringify(body),
+        body: JSON.stringify({ text: aiText }),
       })
       setParsed(result)
     } catch (e) {
-      setAiError(e.message || 'Parse failed')
+      setAiError(e.message || 'Planning failed')
     } finally {
       setAiLoading(false)
     }
@@ -88,31 +84,50 @@ export default function Dashboard() {
     if (!parsed) return
     setAiError('')
     try {
-      let pid = parsed.defaultProjectId || projectIdForAi || null
-      if (!pid && parsed.suggestedProjectName) {
+      let pid = projectIdForAi || null
+      if (!pid) {
         const match = projects.find(
-          (x) =>
-            x.name.toLowerCase() === String(parsed.suggestedProjectName).toLowerCase()
+          (x) => x.name.toLowerCase() === String(parsed.projectName).toLowerCase()
         )
-        if (match) pid = match._id
+        if (match) {
+          pid = match._id
+        } else {
+          const createdProject = await api('/api/projects', {
+            method: 'POST',
+            body: JSON.stringify({
+              name: parsed.projectName,
+              description: parsed.projectDescription || '',
+            }),
+          })
+          pid = createdProject._id
+        }
       }
-      await api('/api/tasks', {
-        method: 'POST',
-        body: JSON.stringify({
-          title: parsed.title,
-          description: parsed.description,
-          priority: parsed.priority,
-          dueDate: parsed.dueDate || null,
-          projectId: pid,
-        }),
-      })
+
+      await Promise.all(
+        parsed.tasks.map((task) =>
+          api('/api/tasks', {
+            method: 'POST',
+            body: JSON.stringify({
+              title: task.title,
+              description: task.description || '',
+              priority: task.priority || 'medium',
+              dueDate: task.dueDate || null,
+              projectId: pid,
+            }),
+          })
+        )
+      )
+
+      setProjectIdForAi('')
       setAiText('')
       setParsed(null)
       await load()
     } catch (e) {
-      setAiError(e.message || 'Could not create task')
+      setAiError(e.message || 'Could not create plan')
     }
   }
+
+  const hasValidGoal = aiText.trim().length > 0
 
   if (!stats) {
     return (
@@ -128,7 +143,7 @@ export default function Dashboard() {
   return (
     <div className="page">
       <h1>Dashboard</h1>
-      <p className="lede">Overview of your tasks and quick AI capture.</p>
+      <p className="lede">Overview of your tasks and quick AI planning.</p>
 
       <div className="stat-grid">
         <div className="stat-card">
@@ -152,19 +167,20 @@ export default function Dashboard() {
       <TaskMiniList title="Overdue" tasks={stats.overdueTasks} />
 
       <section className="card ai-card">
-        <h2>AI-assisted task</h2>
+        <h2>AI goal planner</h2>
         <p className="muted">
-          Describe what you need to do in plain language. Parse, review, then save.
-          Requires <code>GEMINI_API_KEY</code> on the server (default). Use{' '}
-          <code>AI_PROVIDER=openai</code> and <code>OPENAI_API_KEY</code> for OpenAI instead.
+          Describe a goal in plain language. AI generates a project and a task plan you
+          can review before saving. Requires <code>GEMINI_API_KEY</code> on the server
+          (default). Use <code>AI_PROVIDER=openai</code> and{' '}
+          <code>OPENAI_API_KEY</code> for OpenAI instead.
         </p>
         <label className="field">
-          <span>Default project (optional)</span>
+          <span>Save into existing project (optional)</span>
           <select
             value={projectIdForAi}
             onChange={(e) => setProjectIdForAi(e.target.value)}
           >
-            <option value="">No project</option>
+            <option value="">Create or match by AI project name</option>
             {projects.map((p) => (
               <option key={p._id} value={p._id}>
                 {p.name}
@@ -173,41 +189,51 @@ export default function Dashboard() {
           </select>
         </label>
         <label className="field">
-          <span>Natural language</span>
+          <span>Goal or intent</span>
           <textarea
             rows={4}
             value={aiText}
             onChange={(e) => setAiText(e.target.value)}
-            placeholder="e.g. Call dentist tomorrow high priority"
+            placeholder="e.g. Prepare for my final exam in 3 weeks and keep stress low"
           />
         </label>
         <div className="row">
-          <button type="button" className="btn" onClick={runParse} disabled={aiLoading}>
-            {aiLoading ? 'Parsing…' : 'Parse with AI'}
+          <button
+            type="button"
+            className="btn"
+            onClick={runParse}
+            disabled={aiLoading || !hasValidGoal}
+          >
+            {aiLoading ? 'Planning…' : 'Plan with AI'}
           </button>
         </div>
         {aiError ? <p className="error-inline">{aiError}</p> : null}
         {parsed ? (
           <div className="parsed-preview">
-            <h3>Preview</h3>
+            <h3>Plan preview</h3>
             <dl className="kv">
-              <dt>Title</dt>
-              <dd>{parsed.title}</dd>
+              <dt>Project</dt>
+              <dd>{parsed.projectName}</dd>
               <dt>Description</dt>
-              <dd>{parsed.description || '—'}</dd>
-              <dt>Priority</dt>
-              <dd>{parsed.priority}</dd>
-              <dt>Due</dt>
-              <dd>{parsed.dueDate || '—'}</dd>
-              {parsed.suggestedProjectName ? (
-                <>
-                  <dt>Suggested project</dt>
-                  <dd>{parsed.suggestedProjectName}</dd>
-                </>
-              ) : null}
+              <dd>{parsed.projectDescription || '—'}</dd>
+              <dt>Tasks</dt>
+              <dd>{parsed.tasks?.length || 0}</dd>
             </dl>
+            <ul className="mini-list">
+              {parsed.tasks.map((task, idx) => (
+                <li key={`${task.title}-${idx}`}>
+                  <strong>{task.title}</strong>
+                  <span className="muted">
+                    {' '}
+                    · {task.priority}
+                    {task.dueDate ? ` · due ${formatDueDate(task.dueDate)}` : ''}
+                  </span>
+                  {task.description ? <div className="muted">{task.description}</div> : null}
+                </li>
+              ))}
+            </ul>
             <button type="button" className="btn primary" onClick={createFromParsed}>
-              Save task
+              Save project and tasks
             </button>
           </div>
         ) : null}

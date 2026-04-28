@@ -4,9 +4,27 @@ const router = Router()
 
 function buildSystemPrompt() {
   const today = new Date().toISOString().slice(0, 10)
-  return `You extract task fields from user text. Respond with ONLY valid JSON, no markdown fences, using this shape:
-{"title":"string","description":"string or empty","priority":"high"|"medium"|"low","dueDate":"YYYY-MM-DD or null","suggestedProjectName":"string or null"}
-Infer priority from urgency words. Parse relative dates using today as reference when the user says tomorrow, next Friday, etc.
+  return `You are a planning assistant. Convert the user's goal/intent into a practical project plan.
+Respond with ONLY valid JSON, no markdown fences, using this exact shape:
+{
+  "projectName":"string",
+  "projectDescription":"string",
+  "tasks":[
+    {
+      "title":"string",
+      "description":"string",
+      "priority":"high"|"medium"|"low",
+      "dueDate":"YYYY-MM-DD or null"
+    }
+  ]
+}
+Rules:
+- Create 3-10 actionable tasks in a sensible order.
+- Keep task titles concise and specific.
+- Use "medium" when priority is unclear.
+- Parse relative dates using today as reference when the user says tomorrow, next Friday, etc.
+- If no date is implied, set dueDate to null.
+- projectName must be short and clear.
 
 Today (UTC date for reference): ${today}`
 }
@@ -132,9 +150,48 @@ function parseModelJson(content) {
   return JSON.parse(clean)
 }
 
-router.post('/parse-task', async (req, res, next) => {
+function normalizeTask(task) {
+  const title = typeof task?.title === 'string' ? task.title.trim() : ''
+  if (!title) return null
+  const priority = ['high', 'medium', 'low'].includes(task?.priority)
+    ? task.priority
+    : 'medium'
+  return {
+    title,
+    description: typeof task?.description === 'string' ? task.description : '',
+    priority,
+    dueDate: task?.dueDate && task.dueDate !== 'null' ? String(task.dueDate) : null,
+  }
+}
+
+function validatePlan(parsed) {
+  const projectName =
+    typeof parsed?.projectName === 'string' ? parsed.projectName.trim() : ''
+  if (!projectName) {
+    const err = new Error('AI did not produce a project name')
+    err.status = 422
+    throw err
+  }
+
+  const rawTasks = Array.isArray(parsed?.tasks) ? parsed.tasks : []
+  const tasks = rawTasks.map(normalizeTask).filter(Boolean)
+  if (!tasks.length) {
+    const err = new Error('AI did not produce any tasks')
+    err.status = 422
+    throw err
+  }
+
+  return {
+    projectName,
+    projectDescription:
+      typeof parsed?.projectDescription === 'string' ? parsed.projectDescription : '',
+    tasks,
+  }
+}
+
+router.post('/plan-goal', async (req, res, next) => {
   try {
-    const { text, defaultProjectId } = req.body
+    const { text } = req.body
     if (!text || typeof text !== 'string' || !text.trim()) {
       const err = new Error('text is required')
       err.status = 400
@@ -156,28 +213,7 @@ router.post('/parse-task', async (req, res, next) => {
       err.status = 422
       throw err
     }
-
-    const title = typeof parsed.title === 'string' ? parsed.title.trim() : ''
-    if (!title) {
-      const err = new Error('AI did not produce a title')
-      err.status = 422
-      throw err
-    }
-
-    res.json({
-      title,
-      description: typeof parsed.description === 'string' ? parsed.description : '',
-      priority: ['high', 'medium', 'low'].includes(parsed.priority)
-        ? parsed.priority
-        : 'medium',
-      dueDate:
-        parsed.dueDate && parsed.dueDate !== 'null' ? String(parsed.dueDate) : null,
-      suggestedProjectName:
-        parsed.suggestedProjectName && typeof parsed.suggestedProjectName === 'string'
-          ? parsed.suggestedProjectName
-          : null,
-      defaultProjectId: defaultProjectId || null,
-    })
+    res.json(validatePlan(parsed))
   } catch (e) {
     next(e)
   }
