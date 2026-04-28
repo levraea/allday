@@ -20,11 +20,19 @@ npm install
 npm run dev
 ```
 
+Optional sample data:
+
+```bash
+cd server
+npm run seed
+```
+
 API defaults to **http://localhost:3001**. Health check: `GET /api/health`.
 
 ### 2. Client (`client/`)
 
 In development, Vite proxies `/api` to the server (see `client/vite.config.js`).
+Client requests are sent with Axios.
 
 ```bash
 cd client

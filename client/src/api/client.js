@@ -1,25 +1,43 @@
+import axios from 'axios'
+
 const base = (import.meta.env.VITE_API_URL || '').replace(/\/$/, '')
+
+function normalizeBody(body) {
+  if (typeof body !== 'string') return body
+  try {
+    return JSON.parse(body)
+  } catch {
+    return body
+  }
+}
 
 export async function api(path, options = {}) {
   const url = `${base}${path.startsWith('/') ? path : `/${path}`}`
-  const headers = {
-    ...(options.body ? { 'Content-Type': 'application/json' } : {}),
-    ...(options.headers || {}),
-  }
-  const res = await fetch(url, { ...options, headers })
-  if (res.status === 204) return null
-  const ct = res.headers.get('content-type')
-  let data
-  if (ct && ct.includes('application/json')) {
-    data = await res.json()
-  } else {
-    data = { error: await res.text() }
-  }
-  if (!res.ok) {
-    const err = new Error(data?.error || res.statusText)
-    err.status = res.status
-    err.body = data
+  try {
+    const res = await axios.request({
+      url,
+      method: options.method || 'GET',
+      data: options.body !== undefined ? normalizeBody(options.body) : undefined,
+      headers: options.headers || {},
+      withCredentials: false,
+      validateStatus: () => true,
+    })
+
+    if (res.status === 204) return null
+
+    if (res.status < 200 || res.status >= 300) {
+      const err = new Error(res.data?.error || res.statusText || 'Request failed')
+      err.status = res.status
+      err.body = res.data
+      throw err
+    }
+
+    return res.data
+  } catch (error) {
+    if (error?.status) throw error
+    const err = new Error(error?.message || 'Network error')
+    err.status = 0
+    err.body = null
     throw err
   }
-  return data
 }
