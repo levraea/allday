@@ -6,6 +6,7 @@ AI-assisted personal task management (MERN coursework stack): **Vite + React** c
 
 - Node.js 18+ (uses `node --watch` for the API in dev)
 - MongoDB reachable via `MONGODB_URI`
+- `JWT_SECRET` configured for auth tokens
 - Optional: **Gemini** (`GEMINI_API_KEY` from [Google AI Studio](https://aistudio.google.com/apikey)), or set `AI_PROVIDER=openai` and use `OPENAI_API_KEY` for `POST /api/ai/plan-goal`
 
 ## Setup
@@ -15,7 +16,7 @@ AI-assisted personal task management (MERN coursework stack): **Vite + React** c
 ```bash
 cd server
 cp .env.example .env
-# Edit .env — set MONGODB_URI (and GEMINI_API_KEY if you use AI; default provider is Gemini)
+# Edit .env — set MONGODB_URI, JWT_SECRET (and GEMINI_API_KEY if you use AI; default provider is Gemini)
 npm install
 npm run dev
 ```
@@ -50,12 +51,17 @@ For `npm run preview` or a deployed static build, set `VITE_API_URL` to your API
 | Method | Path | Purpose |
 |--------|------|---------|
 | GET | `/api/health` | Liveness + Mongo connection |
+| POST | `/api/auth/signup` | Create user account and return auth token |
+| POST | `/api/auth/login` | Log in and return auth token |
+| GET | `/api/auth/me` | Return current user from auth token |
 | CRUD | `/api/projects` | Projects |
 | CRUD | `/api/tasks` | Tasks (`?projectId=&status=&priority=`) |
 | GET | `/api/stats` | Dashboard counts and lists |
 | POST | `/api/ai/plan-goal` | `{ "text": "..." }` → structured project + task plan (default: Gemini + `GEMINI_API_KEY`; or `AI_PROVIDER=openai` + `OPENAI_API_KEY`) |
 
 Deleting a **project** deletes its **tasks** as well.
+
+All task/project/stats/AI routes require login and are scoped to the logged-in user.
 
 ## Docs
 
