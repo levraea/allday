@@ -6,6 +6,8 @@ import projectsRouter from './routes/projects.js'
 import tasksRouter from './routes/tasks.js'
 import statsRouter from './routes/stats.js'
 import aiRouter from './routes/ai.js'
+import authRouter from './routes/auth.js'
+import { requireAuth } from './middleware/auth.js'
 import { errorHandler } from './middleware/errorHandler.js'
 
 const app = express()
@@ -19,10 +21,11 @@ app.get('/api/health', (req, res) => {
   res.json({ ok: true, mongo: mongoose.connection.readyState === 1 })
 })
 
-app.use('/api/projects', projectsRouter)
-app.use('/api/tasks', tasksRouter)
-app.use('/api/stats', statsRouter)
-app.use('/api/ai', aiRouter)
+app.use('/api/auth', authRouter)
+app.use('/api/projects', requireAuth, projectsRouter)
+app.use('/api/tasks', requireAuth, tasksRouter)
+app.use('/api/stats', requireAuth, statsRouter)
+app.use('/api/ai', requireAuth, aiRouter)
 
 app.use(errorHandler)
 

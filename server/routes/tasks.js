@@ -1,17 +1,24 @@
 import { Router } from 'express'
 import mongoose from 'mongoose'
 import Task, { PRIORITIES, STATUSES } from '../models/Task.js'
+import Project from '../models/Project.js'
 
 const router = Router()
 
 router.get('/', async (req, res, next) => {
   try {
     const { projectId, status, priority } = req.query
-    const filter = {}
+    const filter = { userId: req.user.id }
     if (projectId) {
       if (!mongoose.isValidObjectId(projectId)) {
         const err = new Error('Invalid projectId')
         err.status = 400
+        throw err
+      }
+      const project = await Project.findOne({ _id: projectId, userId: req.user.id })
+      if (!project) {
+        const err = new Error('Project not found')
+        err.status = 404
         throw err
       }
       filter.projectId = projectId
@@ -36,7 +43,10 @@ router.get('/:id', async (req, res, next) => {
       err.status = 400
       throw err
     }
-    const task = await Task.findById(id).populate('projectId', 'name')
+    const task = await Task.findOne({ _id: id, userId: req.user.id }).populate(
+      'projectId',
+      'name'
+    )
     if (!task) {
       const err = new Error('Task not found')
       err.status = 404
@@ -71,7 +81,16 @@ router.post('/', async (req, res, next) => {
       err.status = 400
       throw err
     }
+    if (projectId) {
+      const project = await Project.findOne({ _id: projectId, userId: req.user.id })
+      if (!project) {
+        const err = new Error('Project not found')
+        err.status = 404
+        throw err
+      }
+    }
     const task = await Task.create({
+      userId: req.user.id,
       title: title.trim(),
       description: description != null ? String(description) : '',
       priority: priority || 'medium',
@@ -79,7 +98,10 @@ router.post('/', async (req, res, next) => {
       status: status || 'open',
       projectId: projectId || null,
     })
-    const populated = await Task.findById(task._id).populate('projectId', 'name')
+    const populated = await Task.findOne({ _id: task._id, userId: req.user.id }).populate(
+      'projectId',
+      'name'
+    )
     res.status(201).json(populated)
   } catch (e) {
     next(e)
@@ -128,13 +150,26 @@ router.patch('/:id', async (req, res, next) => {
         err.status = 400
         throw err
       } else {
+        const project = await Project.findOne({
+          _id: req.body.projectId,
+          userId: req.user.id,
+        })
+        if (!project) {
+          const err = new Error('Project not found')
+          err.status = 404
+          throw err
+        }
         updates.projectId = req.body.projectId
       }
     }
-    const task = await Task.findByIdAndUpdate(id, updates, {
-      new: true,
-      runValidators: true,
-    }).populate('projectId', 'name')
+    const task = await Task.findOneAndUpdate(
+      { _id: id, userId: req.user.id },
+      updates,
+      {
+        new: true,
+        runValidators: true,
+      }
+    ).populate('projectId', 'name')
     if (!task) {
       const err = new Error('Task not found')
       err.status = 404
@@ -154,7 +189,7 @@ router.delete('/:id', async (req, res, next) => {
       err.status = 400
       throw err
     }
-    const deleted = await Task.findByIdAndDelete(id)
+    const deleted = await Task.findOneAndDelete({ _id: id, userId: req.user.id })
     if (!deleted) {
       const err = new Error('Task not found')
       err.status = 404

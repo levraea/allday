@@ -5,6 +5,12 @@ export const STATUSES = ['open', 'completed']
 
 const taskSchema = new mongoose.Schema(
   {
+    userId: {
+      type: mongoose.Schema.Types.ObjectId,
+      ref: 'User',
+      required: true,
+      index: true,
+    },
     title: { type: String, required: true, trim: true },
     description: { type: String, default: '' },
     priority: { type: String, enum: PRIORITIES, default: 'medium' },

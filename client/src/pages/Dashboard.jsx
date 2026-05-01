@@ -170,9 +170,7 @@ export default function Dashboard() {
         <h2>AI goal planner</h2>
         <p className="muted">
           Describe a goal in plain language. AI generates a project and a task plan you
-          can review before saving. Requires <code>GEMINI_API_KEY</code> on the server
-          (default). Use <code>AI_PROVIDER=openai</code> and{' '}
-          <code>OPENAI_API_KEY</code> for OpenAI instead.
+          can review before saving.
         </p>
         <label className="field">
           <span>Save into existing project (optional)</span>

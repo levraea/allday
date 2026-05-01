@@ -1,6 +1,7 @@
 import axios from 'axios'
 
 const base = (import.meta.env.VITE_API_URL || '').replace(/\/$/, '')
+const TOKEN_KEY = 'allday_auth_token'
 
 function normalizeBody(body) {
   if (typeof body !== 'string') return body
@@ -13,12 +14,14 @@ function normalizeBody(body) {
 
 export async function api(path, options = {}) {
   const url = `${base}${path.startsWith('/') ? path : `/${path}`}`
+  const token = getAuthToken()
+  const authHeader = token ? { Authorization: `Bearer ${token}` } : {}
   try {
     const res = await axios.request({
       url,
       method: options.method || 'GET',
       data: options.body !== undefined ? normalizeBody(options.body) : undefined,
-      headers: options.headers || {},
+      headers: { ...authHeader, ...(options.headers || {}) },
       withCredentials: false,
       validateStatus: () => true,
     })
@@ -40,4 +43,16 @@ export async function api(path, options = {}) {
     err.body = null
     throw err
   }
+}
+
+export function getAuthToken() {
+  return localStorage.getItem(TOKEN_KEY) || ''
+}
+
+export function setAuthToken(token) {
+  if (token) localStorage.setItem(TOKEN_KEY, token)
+}
+
+export function clearAuthToken() {
+  localStorage.removeItem(TOKEN_KEY)
 }

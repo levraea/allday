@@ -2,6 +2,8 @@ import 'dotenv/config'
 import mongoose from 'mongoose'
 import Project from '../models/Project.js'
 import Task from '../models/Task.js'
+import User from '../models/User.js'
+import bcrypt from 'bcryptjs'
 
 const uri = process.env.MONGODB_URI
 
@@ -26,8 +28,16 @@ async function runSeed() {
 
   await Task.deleteMany({})
   await Project.deleteMany({})
+  await User.deleteMany({})
 
-  const projects = await Project.insertMany(sampleProjects)
+  const demoUser = await User.create({
+    username: 'demo',
+    passwordHash: await bcrypt.hash('password123', 12),
+  })
+
+  const projects = await Project.insertMany(
+    sampleProjects.map((p) => ({ ...p, userId: demoUser._id }))
+  )
   const personal = projects.find((p) => p.name === 'Personal Admin')
   const coursework = projects.find((p) => p.name === 'Coursework Sprint')
 
@@ -38,6 +48,7 @@ async function runSeed() {
       priority: 'medium',
       status: 'open',
       dueDate: new Date(),
+      userId: demoUser._id,
       projectId: personal?._id || null,
     },
     {
@@ -46,6 +57,7 @@ async function runSeed() {
       priority: 'high',
       status: 'open',
       dueDate: new Date(Date.now() + 2 * 24 * 60 * 60 * 1000),
+      userId: demoUser._id,
       projectId: coursework?._id || null,
     },
     {
@@ -54,11 +66,13 @@ async function runSeed() {
       priority: 'medium',
       status: 'open',
       dueDate: new Date(Date.now() + 4 * 24 * 60 * 60 * 1000),
+      userId: demoUser._id,
       projectId: coursework?._id || null,
     },
   ])
 
-  console.log('Seed complete: projects and tasks inserted.')
+  console.log('Seed complete: demo user, projects, and tasks inserted.')
+  console.log('Demo login => username: demo, password: password123')
 }
 
 runSeed()
